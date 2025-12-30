@@ -329,7 +329,7 @@
         // Try multiple CORS proxies in order
         const CORS_PROXIES = [
             url => url, // Try direct first (works locally)
-            url => `https://corsproxy.io/?${encodeURIComponent(url)}`
+            url => `https://raspy-glade-3e8d.q94uah8d7.workers.dev?url=${encodeURIComponent(url)}`,
         ];
 
         let currentProxyIndex = 0;
