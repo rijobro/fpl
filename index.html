@@ -324,8 +324,13 @@
 
     <script>
         // Use CORS proxy for GitHub Pages hosting
-        const CORS_PROXY = "https://corsproxy.io/?";
-        const FPL_BASE_URL = CORS_PROXY + "https://fantasy.premierleague.com/api";
+        const FPL_BASE_URL = "https://fantasy.premierleague.com/api";
+
+        // Helper function to add CORS proxy to URLs
+        function proxifyUrl(url) {
+            // Try without proxy first for local testing, fallback to proxy
+            return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+        }
         const POLL_INTERVAL = 30000; // 30 seconds
         let pollingInterval = null;
         let currentGameweek = null;
@@ -399,7 +404,7 @@
         async function fetchLeagueData() {
             try {
                 // Get bootstrap data for current gameweek and player info
-                const bootstrapResponse = await fetch(`${FPL_BASE_URL}/bootstrap-static/`);
+                const bootstrapResponse = await fetch(proxifyUrl(`${FPL_BASE_URL}/bootstrap-static/`));
                 if (!bootstrapResponse.ok) throw new Error(`Bootstrap API error: ${bootstrapResponse.status}`);
                 const bootstrap = await bootstrapResponse.json();
 
@@ -436,7 +441,7 @@
                 });
 
                 // Get live gameweek data
-                const liveResponse = await fetch(`${FPL_BASE_URL}/event/${selectedGameweek}/live/`);
+                const liveResponse = await fetch(proxifyUrl(`${FPL_BASE_URL}/event/${selectedGameweek}/live/`));
                 if (!liveResponse.ok) throw new Error(`Live API error: ${liveResponse.status}`);
                 const liveData = await liveResponse.json();
 
@@ -450,7 +455,7 @@
                 });
 
                 // Get fixture data to determine which games are currently playing
-                const fixturesResponse = await fetch(`${FPL_BASE_URL}/fixtures/?event=${selectedGameweek}`);
+                const fixturesResponse = await fetch(proxifyUrl(`${FPL_BASE_URL}/fixtures/?event=${selectedGameweek}`));
                 if (!fixturesResponse.ok) throw new Error(`Fixtures API error: ${fixturesResponse.status}`);
                 const fixtures = await fixturesResponse.json();
 
@@ -491,7 +496,7 @@
                 });
 
                 // Get league standings
-                const leagueResponse = await fetch(`${FPL_BASE_URL}/leagues-classic/${LEAGUE_ID}/standings/`);
+                const leagueResponse = await fetch(proxifyUrl(`${FPL_BASE_URL}/leagues-classic/${LEAGUE_ID}/standings/`));
                 if (!leagueResponse.ok) throw new Error(`League API error: ${leagueResponse.status}`);
                 const leagueData = await leagueResponse.json();
 
@@ -503,7 +508,7 @@
                     const playerName = standing.player_name;
 
                     // Get team picks
-                    const picksResponse = await fetch(`${FPL_BASE_URL}/entry/${entryId}/event/${selectedGameweek}/picks/`);
+                    const picksResponse = await fetch(proxifyUrl(`${FPL_BASE_URL}/entry/${entryId}/event/${selectedGameweek}/picks/`));
                     if (!picksResponse.ok) continue;
                     const picksData = await picksResponse.json();
                     const activeChip = picksData.active_chip;
