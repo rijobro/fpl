@@ -326,10 +326,36 @@
         // Use CORS proxy for GitHub Pages hosting
         const FPL_BASE_URL = "https://fantasy.premierleague.com/api";
 
+        // Try multiple CORS proxies in order
+        const CORS_PROXIES = [
+            url => url, // Try direct first (works locally)
+            url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+            url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+            url => `https://corsproxy.io/?${encodeURIComponent(url)}`
+        ];
+
+        let currentProxyIndex = 0;
+
         // Helper function to add CORS proxy to URLs
         function proxifyUrl(url) {
-            // Try without proxy first for local testing, fallback to proxy
-            return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+            return CORS_PROXIES[currentProxyIndex](url);
+        }
+
+        // Helper to try next proxy on failure
+        async function fetchWithFallback(url, options = {}) {
+            for (let i = currentProxyIndex; i < CORS_PROXIES.length; i++) {
+                try {
+                    const proxiedUrl = CORS_PROXIES[i](url);
+                    const response = await fetch(proxiedUrl, options);
+                    if (response.ok) {
+                        currentProxyIndex = i; // Remember working proxy
+                        return response;
+                    }
+                } catch (error) {
+                    console.log(`Proxy ${i} failed, trying next...`);
+                }
+            }
+            throw new Error('All CORS proxies failed');
         }
         const POLL_INTERVAL = 30000; // 30 seconds
         let pollingInterval = null;
@@ -404,8 +430,7 @@
         async function fetchLeagueData() {
             try {
                 // Get bootstrap data for current gameweek and player info
-                const bootstrapResponse = await fetch(proxifyUrl(`${FPL_BASE_URL}/bootstrap-static/`));
-                if (!bootstrapResponse.ok) throw new Error(`Bootstrap API error: ${bootstrapResponse.status}`);
+                const bootstrapResponse = await fetchWithFallback(`${FPL_BASE_URL}/bootstrap-static/`);
                 const bootstrap = await bootstrapResponse.json();
 
                 currentGameweek = bootstrap.events.find(event => event.is_current)?.id || 1;
@@ -441,8 +466,7 @@
                 });
 
                 // Get live gameweek data
-                const liveResponse = await fetch(proxifyUrl(`${FPL_BASE_URL}/event/${selectedGameweek}/live/`));
-                if (!liveResponse.ok) throw new Error(`Live API error: ${liveResponse.status}`);
+                const liveResponse = await fetchWithFallback(`${FPL_BASE_URL}/event/${selectedGameweek}/live/`);
                 const liveData = await liveResponse.json();
 
                 const livePoints = {};
@@ -455,8 +479,7 @@
                 });
 
                 // Get fixture data to determine which games are currently playing
-                const fixturesResponse = await fetch(proxifyUrl(`${FPL_BASE_URL}/fixtures/?event=${selectedGameweek}`));
-                if (!fixturesResponse.ok) throw new Error(`Fixtures API error: ${fixturesResponse.status}`);
+                const fixturesResponse = await fetchWithFallback(`${FPL_BASE_URL}/fixtures/?event=${selectedGameweek}`);
                 const fixtures = await fixturesResponse.json();
 
                 // Create a set of team IDs that are currently playing (started but not finished)
@@ -496,8 +519,7 @@
                 });
 
                 // Get league standings
-                const leagueResponse = await fetch(proxifyUrl(`${FPL_BASE_URL}/leagues-classic/${LEAGUE_ID}/standings/`));
-                if (!leagueResponse.ok) throw new Error(`League API error: ${leagueResponse.status}`);
+                const leagueResponse = await fetchWithFallback(`${FPL_BASE_URL}/leagues-classic/${LEAGUE_ID}/standings/`);
                 const leagueData = await leagueResponse.json();
 
                 // Build team data
@@ -508,76 +530,80 @@
                     const playerName = standing.player_name;
 
                     // Get team picks
-                    const picksResponse = await fetch(proxifyUrl(`${FPL_BASE_URL}/entry/${entryId}/event/${selectedGameweek}/picks/`));
-                    if (!picksResponse.ok) continue;
-                    const picksData = await picksResponse.json();
-                    const activeChip = picksData.active_chip;
+                    try {
+                        const picksResponse = await fetchWithFallback(`${FPL_BASE_URL}/entry/${entryId}/event/${selectedGameweek}/picks/`);
+                        const picksData = await picksResponse.json();
+                        const activeChip = picksData.active_chip;
 
-                    let totalPoints = 0;
-                    const players = [];
+                        let totalPoints = 0;
+                        const players = [];
 
-                    // Sort picks: positions 1-11 first, then 13-15, then 12 (bench GK last)
-                    const sortedPicks = picksData.picks.sort((a, b) => {
-                        const posA = a.position <= 11 ? a.position : (a.position === 12 ? 15 : a.position - 1);
-                        const posB = b.position <= 11 ? b.position : (b.position === 12 ? 15 : b.position - 1);
-                        return posA - posB;
-                    });
-
-                    sortedPicks.forEach(pick => {
-                        const playerId = pick.element;
-                        const playerInfo = playersDict[playerId] || { name: "Unknown", team: 0, position: 0 };
-                        const points = livePoints[playerId] || 0;
-                        const playerTeamId = playerInfo.team;
-
-                        const multiplier = pick.multiplier;
-                        const actualPoints = points * multiplier;
-                        totalPoints += actualPoints;
-
-                        const isPlaying = playingTeams.has(playerTeamId);
-
-                        // Check if player's game started and they didn't play
-                        const minutesPlayed = playerMinutes[playerId] || 0;
-                        const gameStarted = teamFixtures[playerTeamId]?.started || false;
-                        const isNotPlaying = gameStarted && minutesPlayed === 0;
-
-                        // Get fixture score info for this player's team
-                        let fixtureScore = null;
-                        if (teamFixtures[playerTeamId]) {
-                            const fixture = teamFixtures[playerTeamId];
-                            fixtureScore = {
-                                team_h: teamsDict[fixture.team_h].short_name,
-                                team_a: teamsDict[fixture.team_a].short_name,
-                                team_h_score: fixture.team_h_score,
-                                team_a_score: fixture.team_a_score,
-                                minutes: fixture.minutes,
-                                finished: fixture.finished,
-                                started: fixture.started,
-                                player_team: teamsDict[playerTeamId].short_name
-                            };
-                        }
-
-                        players.push({
-                            name: playerInfo.name,
-                            player_id: playerId,
-                            points: points,
-                            actual_points: actualPoints,
-                            multiplier: multiplier,
-                            position: pick.position,
-                            position_type: playerInfo.position,
-                            is_playing: isPlaying,
-                            is_not_playing: isNotPlaying,
-                            fixture_score: fixtureScore,
-                            stats: playerStats[playerId] || {}
+                        // Sort picks: positions 1-11 first, then 13-15, then 12 (bench GK last)
+                        const sortedPicks = picksData.picks.sort((a, b) => {
+                            const posA = a.position <= 11 ? a.position : (a.position === 12 ? 15 : a.position - 1);
+                            const posB = b.position <= 11 ? b.position : (b.position === 12 ? 15 : b.position - 1);
+                            return posA - posB;
                         });
-                    });
 
-                    teamsData.push({
-                        team_name: teamName,
-                        player_name: playerName,
-                        players: players,
-                        total_points: totalPoints,
-                        active_chip: activeChip
-                    });
+                        sortedPicks.forEach(pick => {
+                            const playerId = pick.element;
+                            const playerInfo = playersDict[playerId] || { name: "Unknown", team: 0, position: 0 };
+                            const points = livePoints[playerId] || 0;
+                            const playerTeamId = playerInfo.team;
+
+                            const multiplier = pick.multiplier;
+                            const actualPoints = points * multiplier;
+                            totalPoints += actualPoints;
+
+                            const isPlaying = playingTeams.has(playerTeamId);
+
+                            // Check if player's game started and they didn't play
+                            const minutesPlayed = playerMinutes[playerId] || 0;
+                            const gameStarted = teamFixtures[playerTeamId]?.started || false;
+                            const isNotPlaying = gameStarted && minutesPlayed === 0;
+
+                            // Get fixture score info for this player's team
+                            let fixtureScore = null;
+                            if (teamFixtures[playerTeamId]) {
+                                const fixture = teamFixtures[playerTeamId];
+                                fixtureScore = {
+                                    team_h: teamsDict[fixture.team_h].short_name,
+                                    team_a: teamsDict[fixture.team_a].short_name,
+                                    team_h_score: fixture.team_h_score,
+                                    team_a_score: fixture.team_a_score,
+                                    minutes: fixture.minutes,
+                                    finished: fixture.finished,
+                                    started: fixture.started,
+                                    player_team: teamsDict[playerTeamId].short_name
+                                };
+                            }
+
+                            players.push({
+                                name: playerInfo.name,
+                                player_id: playerId,
+                                points: points,
+                                actual_points: actualPoints,
+                                multiplier: multiplier,
+                                position: pick.position,
+                                position_type: playerInfo.position,
+                                is_playing: isPlaying,
+                                is_not_playing: isNotPlaying,
+                                fixture_score: fixtureScore,
+                                stats: playerStats[playerId] || {}
+                            });
+                        });
+
+                        teamsData.push({
+                            team_name: teamName,
+                            player_name: playerName,
+                            players: players,
+                            total_points: totalPoints,
+                            active_chip: activeChip
+                        });
+                    } catch (error) {
+                        console.error(`Failed to fetch picks for entry ${entryId}:`, error);
+                        // Skip this team if we can't get their picks
+                    }
                 }
 
                 // Sort by total points descending
