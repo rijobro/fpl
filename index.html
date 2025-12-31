@@ -88,36 +88,6 @@
             margin-left: 10px;
         }
 
-        .league-id-input {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .league-id-input input {
-            padding: 6px 8px;
-            font-size: 13px;
-            border: 2px solid #667eea;
-            border-radius: 5px;
-            width: 100px;
-            text-align: center;
-        }
-
-        .league-id-input button {
-            padding: 6px 12px;
-            font-size: 13px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            white-space: nowrap;
-        }
-
-        .league-id-input button:hover {
-            background: #5568d3;
-        }
-
         .status {
             text-align: center;
             margin-bottom: 20px;
@@ -269,11 +239,18 @@
         }
 
         @media (max-width: 768px) {
+            /* Remove purple background on mobile */
+            body {
+                background: white;
+            }
+
             .container {
-                padding: 10px;
-                width: calc(100vw - 20px);
-                height: calc(100vh - 20px);
-                margin: 10px;
+                padding: 0;
+                width: 100vw;
+                height: 100vh;
+                margin: 0;
+                box-shadow: none;
+                border-radius: 0;
             }
 
             h1 {
@@ -284,6 +261,16 @@
                 font-size: 0.9em;
             }
 
+            /* Hide the entire subtitle container (league name + arrows) on mobile */
+            .subtitle-container {
+                display: none !important;
+            }
+
+            /* Hide last updated time on mobile */
+            .last-updated {
+                display: none;
+            }
+
             th, td {
                 padding: 6px 3px;
                 font-size: 11px;
@@ -292,16 +279,22 @@
             .player-cell {
                 font-size: 10px;
             }
+
+            /* Hide fixture scores on mobile */
+            .fixture-score {
+                display: none !important;
+            }
+
+            /* Simplify team name cell - hide player manager name and status */
+            .mobile-hide {
+                display: none !important;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="subtitle-container">
-            <div class="league-id-input">
-                <input type="number" id="leagueIdInput" placeholder="League ID" value="908457">
-                <button onclick="loadLeague()">Load</button>
-            </div>
             <span class="nav-arrow" id="prevWeek" onclick="changeGameweek(-1)">◀</span>
             <div class="subtitle" id="leagueName">
                 Loading...
@@ -360,7 +353,11 @@
         let currentGameweek = null;
         let selectedGameweek = null;
         let totalGameweeks = 38;
-        let LEAGUE_ID = 908457;
+
+        // Get league ID and gameweek from URL query parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        let LEAGUE_ID = parseInt(urlParams.get('league')) || 908457;
+        const INITIAL_GAMEWEEK = urlParams.get('gw') ? parseInt(urlParams.get('gw')) : null;
 
         function showStatus(message, type) {
             const status = document.getElementById('status');
@@ -395,6 +392,11 @@
             if (newGameweek >= 1 && newGameweek <= totalGameweeks) {
                 selectedGameweek = newGameweek;
 
+                // Update URL with new gameweek
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.set('gw', selectedGameweek);
+                window.history.pushState({}, '', newUrl);
+
                 // Stop auto-refresh when navigating away from current gameweek
                 if (selectedGameweek !== currentGameweek && pollingInterval) {
                     clearInterval(pollingInterval);
@@ -408,23 +410,6 @@
             }
         }
 
-        function loadLeague() {
-            const input = document.getElementById('leagueIdInput');
-            const newLeagueId = parseInt(input.value);
-            if (newLeagueId && newLeagueId > 0) {
-                LEAGUE_ID = newLeagueId;
-                selectedGameweek = null;
-
-                // Restart polling
-                if (pollingInterval) {
-                    clearInterval(pollingInterval);
-                }
-
-                fetchLeagueData();
-                pollingInterval = setInterval(fetchLeagueData, POLL_INTERVAL);
-            }
-        }
-
         async function fetchLeagueData() {
             try {
                 // Get bootstrap data for current gameweek and player info
@@ -435,7 +420,7 @@
 
                 // Use provided gameweek or default to current
                 if (!selectedGameweek) {
-                    selectedGameweek = currentGameweek;
+                    selectedGameweek = INITIAL_GAMEWEEK !== null ? INITIAL_GAMEWEEK : currentGameweek;
                 }
 
                 // Get total number of gameweeks and validate
@@ -733,8 +718,8 @@
                 // Team name cell
                 const teamCell = document.createElement('td');
                 teamCell.className = 'team-name';
-                const statusText = `<span style="font-size: 9px; color: #999;">${awaitCount} AWAIT / ${playingCount} PLAYING / ${doneCount} DONE</span>`;
-                teamCell.innerHTML = `<strong>${team.team_name}</strong><br><small>${team.player_name}</small><br>${statusText}`;
+                const statusText = `<span class="mobile-hide" style="font-size: 9px; color: #999;">${awaitCount} AWAIT / ${playingCount} PLAYING / ${doneCount} DONE</span>`;
+                teamCell.innerHTML = `<strong>${team.team_name}</strong><br><small class="mobile-hide">${team.player_name}</small><br>${statusText}`;
                 row.appendChild(teamCell);
 
                 // Chip cell
