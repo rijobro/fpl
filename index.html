@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>FPL Live League Points</title>
+    <link rel="manifest" href="data:application/json;base64,eyJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsIm9yaWVudGF0aW9uIjoibGFuZHNjYXBlIn0=">
     <style>
         * {
             margin: 0;
@@ -238,7 +242,7 @@
             opacity: 0.3;
         }
 
-        @media (max-width: 1024px) or (max-height: 1024px) {
+        @media (max-width: 1024px), (max-height: 1024px) {
             /* Remove purple background on mobile */
             body {
                 background: white;
@@ -254,11 +258,11 @@
             }
 
             h1 {
-                font-size: 1.5em;
+                font-size: 2em;
             }
 
             .subtitle {
-                font-size: 0.9em;
+                font-size: 1.2em;
             }
 
             /* Hide the entire subtitle container (league name + arrows) on mobile */
@@ -271,13 +275,42 @@
                 display: none;
             }
 
+            table {
+                font-size: 20px;
+            }
+
             th, td {
-                padding: 6px 3px;
-                font-size: 11px;
+                padding: 10px 6px;
+                font-size: 16px;
+            }
+
+            td.team-name {
+                font-size: 18px;
+                font-weight: 700;
+            }
+
+            td.chip-cell {
+                font-size: 16px;
             }
 
             .player-cell {
-                font-size: 10px;
+                font-size: 16px;
+                line-height: 1.4;
+            }
+
+            .player-name {
+                font-size: 14px;
+                font-weight: 600;
+            }
+
+            .player-points {
+                font-size: 18px;
+                font-weight: 700;
+            }
+
+            .total-column {
+                font-size: 20px;
+                font-weight: 800;
             }
 
             /* Hide fixture scores on mobile */
@@ -860,8 +893,24 @@
         // Also trigger on zoom/fullscreen changes
         window.visualViewport?.addEventListener('resize', handleResize);
 
+        // Force landscape orientation on mobile devices
+        function requestLandscapeOrientation() {
+            // Check if we're on a mobile device
+            const isMobile = window.innerWidth <= 1024 || window.innerHeight <= 1024;
+
+            if (isMobile && screen.orientation && screen.orientation.lock) {
+                // Try to lock to landscape orientation
+                screen.orientation.lock('landscape').catch(err => {
+                    console.log('Orientation lock not supported or failed:', err);
+                });
+            }
+        }
+
         // Start auto-refresh on page load
         window.addEventListener('DOMContentLoaded', () => {
+            // Request landscape orientation on mobile
+            requestLandscapeOrientation();
+
             fetchLeagueData(); // Load immediately
             pollingInterval = setInterval(fetchLeagueData, POLL_INTERVAL); // Then poll every interval
         });
