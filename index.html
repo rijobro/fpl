@@ -476,7 +476,7 @@
             );
         }
 
-        function buildColumnLayout(freqMap) {
+        function commonPlayerColumns(freqMap) {
             const DEF = [];
             const MID = [];
             const FWD = [];
@@ -787,7 +787,7 @@
 
         function renderTable(data) {
             const freqMap = buildPlayerFrequency(data.teams);
-            const columnLayout = buildColumnLayout(freqMap);
+            const columnLayout = commonPlayerColumns(freqMap);
 
             const tableHead = document.getElementById('tableHead');
             const tableBody = document.getElementById('tableBody');
