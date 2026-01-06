@@ -352,40 +352,51 @@
         // Use CORS proxy for GitHub Pages hosting
         const FPL_BASE_URL = "https://fantasy.premierleague.com/api";
 
-        // Try multiple CORS proxies in order
-        const CORS_PROXIES = [
-            url => url, // Try direct first (works locally)
-            url => `https://raspy-glade-3e8d.q94uah8d7.workers.dev?url=${encodeURIComponent(url)}`,
-        ];
-
-        let currentProxyIndex = 0;
-
         // Helper function to add CORS proxy to URLs
         function proxifyUrl(url) {
-            return CORS_PROXIES[currentProxyIndex](url);
+            return `https://raspy-glade-3e8d.q94uah8d7.workers.dev?url=${encodeURIComponent(url)}`
         }
 
         // Helper to try next proxy on failure
         async function fetchWithFallback(url, options = {}) {
-            for (let i = currentProxyIndex; i < CORS_PROXIES.length; i++) {
-                try {
-                    const proxiedUrl = CORS_PROXIES[i](url);
-                    const response = await fetch(proxiedUrl, options);
-                    if (response.ok) {
-                        currentProxyIndex = i; // Remember working proxy
-                        return response;
-                    }
-                } catch (error) {
-                    console.log(`Proxy ${i} failed, trying next...`);
+            const proxiedUrl = proxifyUrl(url);
+            try {
+                const response = await fetch(proxiedUrl, options);
+                if (response.ok) {
+                    return response;
                 }
+                console.error(
+                    `Non-OK response`,
+                    {
+                        status: response.status,
+                        statusText: response.statusText,
+                        url: proxiedUrl
+                    }
+                );
+
+            } catch (error) {
+                console.error(
+                    `Fetch error`,
+                    {
+                        message: error.message,
+                        stack: error.stack,
+                        url: proxiedUrl
+                    }
+                );
             }
-            throw new Error('All CORS proxies failed');
         }
+
         const POLL_INTERVAL = 30000; // 30 seconds
         let pollingInterval = null;
         let currentGameweek = null;
         let selectedGameweek = null;
         let totalGameweeks = 38;
+
+        const POSITION_COLUMNS = {
+            DEF: [1, 2, 3, 4, 5],    // max 5
+            MID: [6, 7, 8, 9, 10],   // max 5
+            FWD: [11, 12, 13]        // logical, but mapped to 9–10 later
+        };
 
         // Get league ID and gameweek from URL query parameters
         const urlParams = new URLSearchParams(window.location.search);
@@ -441,6 +452,101 @@
 
                 fetchLeagueData();
             }
+        }
+
+        function buildPlayerFrequency(teams) {
+            const freq = new Map();
+
+            teams.forEach(team => {
+                team.players.slice(1, 11).forEach(p => {
+                    if (!freq.has(p.player_id)) {
+                        freq.set(p.player_id, {
+                            count: 0,
+                            name: p.name,
+                            position_type: p.position_type
+                        });
+                    }
+                    freq.get(p.player_id).count++;
+                });
+            });
+
+            // sort by frequency (descending)
+            return new Map(
+                [...freq.entries()].sort((a, b) => b[1].count - a[1].count)
+            );
+        }
+
+        function buildColumnLayout(freqMap) {
+            const DEF = [];
+            const MID = [];
+            const FWD = [];
+
+            for (const [id, meta] of freqMap.entries()) {
+                const entry = { id, ...meta };
+                if (meta.position_type === 2) DEF.push(entry);
+                if (meta.position_type === 3) MID.push(entry);
+                if (meta.position_type === 4) FWD.push(entry);
+            }
+
+            DEF.sort((a, b) => b.count - a.count);
+            MID.sort((a, b) => b.count - a.count);
+            FWD.sort((a, b) => b.count - a.count);
+
+            const layout = Array(11).fill(null);
+
+            // Defenders
+            layout[1] = DEF[0].id ?? null;
+            layout[2] = DEF[1].id ?? null;
+            layout[3] = DEF[2].id ?? null;
+
+            // Midfielders
+            layout[6] = MID[0].id ?? null;
+            layout[7] = MID[1].id ?? null;
+
+            // Forwards
+            layout[10] = FWD[0].id ?? null;
+
+            return layout;
+        }
+
+        function mapTeamToColumns(team, columnLayout) {
+            const slots = Array(15).fill(null);
+
+            // GK always zero
+            slots[0] = team.players[0];
+
+            // loop over players and fill them in if most common
+            for (let i = 1; i < 11; i++) {
+                const player = team.players[i];
+
+                let index = columnLayout.indexOf(player.player_id);
+
+                // plus 1 to account for GK
+                if (index != -1) {
+                    slots[index] = player;
+                }
+            }
+
+            // loop again and fill in blanks
+            for (let i = 1; i < 11; i++) {
+                const player = team.players[i];
+
+                // skip if already accounted for
+                if (slots.some(p => p?.player_id === player.player_id)) {
+                    continue
+                }
+
+                // next blank
+                index = slots.indexOf(null, 1);
+                slots[index] = player;
+            }
+
+            // Bench always at end
+            for (let i = 11; i < 15; i++) {
+                slots[i] = team.players[i];
+            }
+
+            return slots;
         }
 
         async function fetchLeagueData() {
@@ -680,6 +786,9 @@
         }
 
         function renderTable(data) {
+            const freqMap = buildPlayerFrequency(data.teams);
+            const columnLayout = buildColumnLayout(freqMap);
+
             const tableHead = document.getElementById('tableHead');
             const tableBody = document.getElementById('tableBody');
 
@@ -773,10 +882,18 @@
                 }
                 row.appendChild(chipCell);
 
+                const orderedPlayers = mapTeamToColumns(team, columnLayout);
+
                 // Player cells
-                team.players.forEach((player, idx) => {
+                orderedPlayers.forEach((player, idx) => {
                     const cell = document.createElement('td');
                     cell.className = 'player-cell';
+
+                    if (!player) {
+                        cell.classList.add('empty-slot');
+                        row.appendChild(cell);
+                        return;
+                    }
 
                     if (player.position > 11) {
                         cell.classList.add('bench');
