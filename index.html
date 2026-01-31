@@ -28,13 +28,13 @@
         }
 
         .container {
-            width: calc(100vw - 40px);
-            height: calc(100vh - 40px);
-            margin: 20px;
+            width: calc(100vw - 20px);
+            height: calc(100vh - 20px);
+            margin: 10px;
             background: white;
             border-radius: 10px;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-            padding: 15px;
+            padding: 8px;
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -43,16 +43,16 @@
         h1 {
             text-align: center;
             color: #333;
-            margin-bottom: 10px;
-            font-size: 2em;
+            margin-bottom: 4px;
+            font-size: 1.8em;
         }
 
         .subtitle-container {
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 8px;
-            gap: 15px;
+            margin-bottom: 4px;
+            gap: 10px;
             flex-shrink: 0;
         }
 
@@ -108,7 +108,7 @@
         .table-container {
             flex: 1;
             overflow: hidden;
-            margin-top: 5px;
+            margin-top: 2px;
             display: flex;
             flex-direction: column;
             position: relative;
@@ -123,11 +123,11 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 16px;
+            font-size: 18px;
         }
 
         th, td {
-            padding: 8px 6px;
+            padding: 4px 4px;
             text-align: center;
             border: 1px solid #ddd;
             white-space: nowrap;
@@ -142,6 +142,19 @@
             position: sticky;
             top: 0;
             z-index: 10;
+        }
+
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        th.sortable:hover {
+            background: #7c92f0;
+        }
+
+        th.sorted {
+            background: #4c5fcf;
         }
 
         th.team-header {
@@ -164,14 +177,14 @@
             font-weight: 600;
             background: #f8f9fa;
             white-space: nowrap;
-            padding-left: 8px;
-            padding-right: 8px;
+            padding-left: 4px;
+            padding-right: 4px;
         }
 
         td.chip-cell {
             text-align: center;
             font-weight: 600;
-            font-size: 13px;
+            font-size: 14px;
             text-transform: uppercase;
             background: #fff3cd;
             color: #856404;
@@ -199,28 +212,30 @@
         }
 
         .player-cell {
-            font-size: 13px;
-            line-height: 1.3;
+            font-size: 15px;
+            line-height: 1.2;
         }
 
         .player-name {
             display: block;
             font-weight: 500;
-            font-size: 11px;
+            font-size: 16px;
+            margin-bottom: 1px;
         }
 
         .player-points {
             display: block;
             color: #667eea;
             font-weight: 700;
-            font-size: 13px;
+            font-size: 15px;
+            margin-bottom: 1px;
         }
 
         .fixture-score {
             display: block;
-            font-size: 10px;
+            font-size: 11px;
             color: #666;
-            margin-top: 2px;
+            margin-top: 0;
             font-weight: normal;
         }
 
@@ -365,24 +380,9 @@
                 if (response.ok) {
                     return response;
                 }
-                console.error(
-                    `Non-OK response`,
-                    {
-                        status: response.status,
-                        statusText: response.statusText,
-                        url: proxiedUrl
-                    }
-                );
-
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             } catch (error) {
-                console.error(
-                    `Fetch error`,
-                    {
-                        message: error.message,
-                        stack: error.stack,
-                        url: proxiedUrl
-                    }
-                );
+                throw error;
             }
         }
 
@@ -391,6 +391,9 @@
         let currentGameweek = null;
         let selectedGameweek = null;
         let totalGameweeks = 38;
+        let currentSortColumn = 'gw';
+        let currentSortDirection = 'desc';
+        let cachedTeamsData = null;
 
         const POSITION_COLUMNS = {
             DEF: [1, 2, 3, 4, 5],    // max 5
@@ -574,7 +577,8 @@
                     playersDict[player.id] = {
                         name: player.web_name,
                         team: player.team,
-                        position: player.element_type
+                        position: player.element_type,
+                        total_points: player.total_points
                     };
                 });
 
@@ -650,6 +654,7 @@
                     const entryId = standing.entry;
                     const teamName = standing.entry_name;
                     const playerName = standing.player_name;
+                    const managerSeasonTotal = standing.total;
 
                     // Get team picks
                     try {
@@ -669,7 +674,7 @@
 
                         sortedPicks.forEach(pick => {
                             const playerId = pick.element;
-                            const playerInfo = playersDict[playerId] || { name: "Unknown", team: 0, position: 0 };
+                            const playerInfo = playersDict[playerId] || { name: "Unknown", team: 0, position: 0, total_points: 0 };
                             const points = livePoints[playerId] || 0;
                             const playerTeamId = playerInfo.team;
 
@@ -720,6 +725,7 @@
                             player_name: playerName,
                             players: players,
                             total_points: totalPoints,
+                            total_season_points: managerSeasonTotal + totalPoints,
                             active_chip: activeChip
                         });
                     } catch (error) {
@@ -728,14 +734,14 @@
                     }
                 }
 
-                // Sort by total points descending
-                teamsData.sort((a, b) => b.total_points - a.total_points);
+                // Cache the teams data for re-sorting
+                cachedTeamsData = teamsData;
 
                 const data = {
                     gameweek: selectedGameweek,
                     current_gameweek: currentGameweek,
                     total_gameweeks: totalGameweeks,
-                    teams: teamsData,
+                    teams: sortTeams(teamsData, currentSortColumn, currentSortDirection),
                     league_name: leagueData.league.name
                 };
 
@@ -752,8 +758,73 @@
                 updateNavigationArrows();
                 hideStatus();
             } catch (error) {
-                showStatus(`Error: ${error.message}`, 'error');
+                // Just log errors to console, don't show to user
                 console.error('Error fetching league data:', error);
+                hideStatus();
+            }
+        }
+
+        function sortTeams(teams, column, direction) {
+            const sorted = [...teams].sort((a, b) => {
+                let aVal, bVal;
+
+                if (column === 'gw') {
+                    aVal = a.total_points;
+                    bVal = b.total_points;
+                } else if (column === 'avg') {
+                    // Calculate playing count for each team
+                    let aPlaying = 0, bPlaying = 0;
+                    a.players.slice(0, 11).forEach(player => {
+                        if (player.fixture_score) {
+                            if (player.fixture_score.started) {
+                                aPlaying++;
+                            }
+                        }
+                    });
+                    b.players.slice(0, 11).forEach(player => {
+                        if (player.fixture_score) {
+                            if (player.fixture_score.started) {
+                                bPlaying++;
+                            }
+                        }
+                    });
+
+                    aVal = aPlaying > 0 ? a.total_points / aPlaying : 0;
+                    bVal = bPlaying > 0 ? b.total_points / bPlaying : 0;
+                } else if (column === 'season') {
+                    aVal = a.total_season_points;
+                    bVal = b.total_season_points;
+                }
+
+                if (direction === 'desc') {
+                    return bVal - aVal;
+                } else {
+                    return aVal - bVal;
+                }
+            });
+
+            return sorted;
+        }
+
+        function handleSort(column) {
+            // Toggle direction if clicking the same column, otherwise default to desc
+            if (currentSortColumn === column) {
+                currentSortDirection = currentSortDirection === 'desc' ? 'asc' : 'desc';
+            } else {
+                currentSortColumn = column;
+                currentSortDirection = 'desc';
+            }
+
+            // Re-render with sorted data
+            if (cachedTeamsData) {
+                const data = {
+                    gameweek: selectedGameweek,
+                    current_gameweek: currentGameweek,
+                    total_gameweeks: totalGameweeks,
+                    teams: sortTeams(cachedTeamsData, currentSortColumn, currentSortDirection),
+                    league_name: document.getElementById('leagueName').textContent.split(' - ')[0]
+                };
+                renderTable(data);
             }
         }
 
@@ -776,8 +847,8 @@
             const scaleY = containerHeight / tableHeight;
             const scale = Math.min(scaleX, scaleY);
 
-            // Allow scaling up to 3x for better readability on large screens
-            const finalScale = Math.min(scale, 3);
+            // Allow unlimited scaling for maximum text size
+            const finalScale = scale;
 
             // Apply scale
             wrapper.style.transform = `scale(${finalScale})`;
@@ -833,7 +904,28 @@
                 headerRow.appendChild(th);
             }
 
-            headerRow.innerHTML += '<th class="total-column">Total</th>';
+            // Add sortable column headers
+            const gwHeader = document.createElement('th');
+            gwHeader.className = 'total-column sortable' + (currentSortColumn === 'gw' ? ' sorted' : '');
+            gwHeader.textContent = 'GW' + (currentSortColumn === 'gw' ? (currentSortDirection === 'desc' ? ' ↓' : ' ↑') : '');
+            gwHeader.title = 'Gameweek total points';
+            gwHeader.onclick = () => handleSort('gw');
+            headerRow.appendChild(gwHeader);
+
+            const avgHeader = document.createElement('th');
+            avgHeader.className = 'total-column sortable' + (currentSortColumn === 'avg' ? ' sorted' : '');
+            avgHeader.textContent = 'Avg' + (currentSortColumn === 'avg' ? (currentSortDirection === 'desc' ? ' ↓' : ' ↑') : '');
+            avgHeader.title = 'Average points per player (only Playing + Done)';
+            avgHeader.onclick = () => handleSort('avg');
+            headerRow.appendChild(avgHeader);
+
+            const seasonHeader = document.createElement('th');
+            seasonHeader.className = 'total-column sortable' + (currentSortColumn === 'season' ? ' sorted' : '');
+            seasonHeader.textContent = 'Season' + (currentSortColumn === 'season' ? (currentSortDirection === 'desc' ? ' ↓' : ' ↑') : '');
+            seasonHeader.title = 'Total season points';
+            seasonHeader.onclick = () => handleSort('season');
+            headerRow.appendChild(seasonHeader);
+
             tableHead.appendChild(headerRow);
 
             // Create data rows
@@ -979,6 +1071,27 @@
                 totalCell.className = 'total-column';
                 totalCell.textContent = team.total_points;
                 row.appendChild(totalCell);
+
+                // Points per player cell
+                const pppCell = document.createElement('td');
+                pppCell.className = 'total-column';
+                const playersPlayed = playingCount + doneCount;
+                if (playersPlayed > 0) {
+                    const ppp = (team.total_points / playersPlayed).toFixed(1);
+                    pppCell.textContent = ppp;
+                    pppCell.title = `${team.total_points} points / ${playersPlayed} players`;
+                } else {
+                    pppCell.textContent = '-';
+                    pppCell.title = 'No players have played yet';
+                }
+                row.appendChild(pppCell);
+
+                // Total season points cell
+                const seasonCell = document.createElement('td');
+                seasonCell.className = 'total-column';
+                seasonCell.textContent = team.total_season_points;
+                seasonCell.title = `Total season points`;
+                row.appendChild(seasonCell);
 
                 tableBody.appendChild(row);
             });
