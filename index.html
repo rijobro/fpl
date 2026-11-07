@@ -239,11 +239,6 @@
             white-space: nowrap;
         }
 
-        th.chip-header {
-            width: 1%;
-            white-space: nowrap;
-        }
-
         th.player-header {
             width: auto;
         }
@@ -257,19 +252,30 @@
             padding-right: 4px;
         }
 
-        td.chip-cell {
-            text-align: center;
-            font-weight: 600;
-            font-size: 14px;
-            text-transform: uppercase;
-            background: var(--chip-bg);
-            color: var(--chip-text);
-            white-space: nowrap;
+        /* Bottom line of the team cell: XI progress bar, then the chip badge
+           (if any) in the bottom-right corner. */
+        .team-foot {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 4px;
         }
 
-        td.chip-cell.empty {
-            background: var(--cell-bg);
-            color: var(--chip-empty);
+        .team-foot .xi-bar {
+            flex: 1;
+            margin-top: 0;
+        }
+
+        .chip-badge {
+            margin-left: auto;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: 0.04em;
+            padding: 2px 4px;
+            border-radius: 3px;
+            background: var(--chip-bg);
+            color: var(--chip-text);
         }
 
         tbody tr:hover td {
@@ -420,10 +426,6 @@
             td.team-name {
                 font-size: 18px;
                 font-weight: 700;
-            }
-
-            td.chip-cell {
-                font-size: 16px;
             }
 
             .player-cell {
@@ -1020,7 +1022,7 @@
 
             // Create header row with GK, P2-P11, B1-B3, B GK labels
             const headerRow = document.createElement('tr');
-            headerRow.innerHTML = '<th class="team-header">Team</th><th class="chip-header">Chip</th>';
+            headerRow.innerHTML = '<th class="team-header">Team</th>';
 
             // Add starting XI headers (GK, P2 - P11)
             for (let i = 1; i <= 11; i++) {
@@ -1100,26 +1102,12 @@
                 teamCell.className = 'team-name';
                 const seg = (cls, n) => n ? `<span class="${cls}" style="flex: ${n}"></span>` : '';
                 const statusText = `<div class="xi-bar mobile-hide" title="Starting XI: ${doneCount} done, ${playingCount} playing, ${awaitCount} to come">${seg('done', doneCount)}${seg('live', playingCount)}${seg('await', awaitCount)}</div>`;
-                teamCell.innerHTML = `<strong>${team.team_name}</strong><br><small class="mobile-hide">${team.player_name}</small>${statusText}`;
+                const chipNames = { '3xc': 'TC', bboost: 'BB', freehit: 'FH', wildcard: 'WC', manager: 'AM' };
+                const chip = team.active_chip
+                    ? `<span class="chip-badge" title="Active chip: ${team.active_chip}">${chipNames[team.active_chip] || team.active_chip.toUpperCase()}</span>`
+                    : '';
+                teamCell.innerHTML = `<strong>${team.team_name}</strong><br><small class="mobile-hide">${team.player_name}</small><div class="team-foot">${statusText}${chip}</div>`;
                 row.appendChild(teamCell);
-
-                // Chip cell
-                const chipCell = document.createElement('td');
-                if (team.active_chip) {
-                    chipCell.className = 'chip-cell';
-                    // Format chip name
-                    let chipDisplay = team.active_chip;
-                    if (chipDisplay === '3xc') chipDisplay = '3xC';
-                    else if (chipDisplay === 'bboost') chipDisplay = 'BB';
-                    else if (chipDisplay === 'freehit') chipDisplay = 'FH';
-                    else if (chipDisplay === 'wildcard') chipDisplay = 'WC';
-                    chipCell.textContent = chipDisplay;
-                    chipCell.title = `Active Chip: ${team.active_chip}`;
-                } else {
-                    chipCell.className = 'chip-cell empty';
-                    chipCell.textContent = '-';
-                }
-                row.appendChild(chipCell);
 
                 const orderedPlayers = mapTeamToColumns(team, columnLayout);
 
