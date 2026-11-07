@@ -9,6 +9,71 @@
     <title>FPL Live League Points</title>
     <link rel="manifest" href="data:application/json;base64,eyJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsIm9yaWVudGF0aW9uIjoibGFuZHNjYXBlIn0=">
     <style>
+        /* Dark is the default; ?theme=light gives the original light look. */
+        :root {
+            color-scheme: dark;
+            --page-bg: #111318;
+            --card-bg: transparent;
+            --card-shadow: none;
+            --text: #e4e6eb;
+            --muted: #9aa0aa;
+            --faint: #6b717c;
+            --accent: #8b9cff;
+            --border: #2c313a;
+            --head-bg: #3f4fbf;
+            --head-hover: #4c5dd0;
+            --head-sorted: #33419f;
+            --cell-bg: #181b21;
+            --team-bg: #1f232a;
+            --hover-bg: #22262e;
+            --total-bg: #2a2f38;
+            --chip-bg: rgba(255, 193, 7, 0.16);
+            --chip-text: #ffd54f;
+            --chip-empty: #4a4f58;
+            --playing-bg: rgba(40, 167, 69, 0.28);
+            --playing-border: #2fb653;
+            --finished-bg: #262a31;
+            --not-playing-bg: rgba(220, 53, 69, 0.22);
+            --empty-bg: #15181d;
+            --error-bg: rgba(220, 53, 69, 0.25);
+            --error-text: #f5a3ab;
+        }
+
+        html.light {
+            color-scheme: light;
+            --page-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --card-bg: white;
+            --card-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            --text: #333;
+            --muted: #666;
+            --faint: #999;
+            --accent: #667eea;
+            --border: #ddd;
+            --head-bg: #667eea;
+            --head-hover: #7c92f0;
+            --head-sorted: #4c5fcf;
+            --cell-bg: transparent;
+            --team-bg: #f8f9fa;
+            --hover-bg: #f5f5f5;
+            --total-bg: #e9ecef;
+            --chip-bg: #fff3cd;
+            --chip-text: #856404;
+            --chip-empty: #ccc;
+            --playing-bg: #d4edda;
+            --playing-border: #28a745;
+            --finished-bg: #e9ecef;
+            --not-playing-bg: #f8d7da;
+            --empty-bg: #fafafa;
+            --error-bg: #f8d7da;
+            --error-text: #721c24;
+        }
+
+        /* ?embed=1 (e.g. in a Home Assistant iframe card): no page background,
+           so the host shows through below the table. */
+        html.embed {
+            --page-bg: transparent;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -17,7 +82,8 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--page-bg);
+            color: var(--text);
             height: 100vh;
             margin: 0;
             padding: 0;
@@ -31,9 +97,9 @@
             width: calc(100vw - 20px);
             height: calc(100vh - 20px);
             margin: 10px;
-            background: white;
+            background: var(--card-bg);
             border-radius: 10px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            box-shadow: var(--card-shadow);
             padding: 8px;
             display: flex;
             flex-direction: column;
@@ -42,7 +108,7 @@
 
         h1 {
             text-align: center;
-            color: #333;
+            color: var(--text);
             margin-bottom: 4px;
             font-size: 1.8em;
         }
@@ -58,14 +124,14 @@
 
         .subtitle {
             text-align: center;
-            color: #666;
+            color: var(--muted);
             font-size: 0.95em;
         }
 
         .nav-arrow {
             cursor: pointer;
             font-size: 24px;
-            color: #667eea;
+            color: var(--accent);
             user-select: none;
             padding: 5px 10px;
             border-radius: 5px;
@@ -73,11 +139,11 @@
         }
 
         .nav-arrow:hover {
-            background: #f0f0f0;
+            background: var(--hover-bg);
         }
 
         .nav-arrow.disabled {
-            color: #ccc;
+            color: var(--chip-empty);
             cursor: not-allowed;
         }
 
@@ -86,7 +152,7 @@
         }
 
         .last-updated {
-            color: #999;
+            color: var(--faint);
             font-size: 0.75em;
             font-weight: normal;
             margin-left: 10px;
@@ -101,8 +167,8 @@
         }
 
         .status.error {
-            background: #f8d7da;
-            color: #721c24;
+            background: var(--error-bg);
+            color: var(--error-text);
         }
 
         .table-container {
@@ -129,14 +195,18 @@
         th, td {
             padding: 4px 4px;
             text-align: center;
-            border: 1px solid #ddd;
+            border: 1px solid var(--border);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
+        td {
+            background: var(--cell-bg);
+        }
+
         th {
-            background: #667eea;
+            background: var(--head-bg);
             color: white;
             font-weight: 600;
             position: sticky;
@@ -150,11 +220,11 @@
         }
 
         th.sortable:hover {
-            background: #7c92f0;
+            background: var(--head-hover);
         }
 
         th.sorted {
-            background: #4c5fcf;
+            background: var(--head-sorted);
         }
 
         th.team-header {
@@ -175,7 +245,7 @@
         td.team-name {
             text-align: left;
             font-weight: 600;
-            background: #f8f9fa;
+            background: var(--team-bg);
             white-space: nowrap;
             padding-left: 4px;
             padding-right: 4px;
@@ -186,24 +256,24 @@
             font-weight: 600;
             font-size: 14px;
             text-transform: uppercase;
-            background: #fff3cd;
-            color: #856404;
+            background: var(--chip-bg);
+            color: var(--chip-text);
             white-space: nowrap;
         }
 
         td.chip-cell.empty {
-            background: transparent;
-            color: #ccc;
+            background: var(--cell-bg);
+            color: var(--chip-empty);
         }
 
-        tbody tr:hover {
-            background: #f5f5f5;
+        tbody tr:hover td {
+            background: var(--hover-bg);
         }
 
         .total-column {
-            background: #e9ecef !important;
+            background: var(--total-bg) !important;
             font-weight: 700;
-            color: #333;
+            color: var(--text);
         }
 
         .bench {
@@ -225,7 +295,7 @@
 
         .player-points {
             display: block;
-            color: #667eea;
+            color: var(--accent);
             font-weight: 700;
             font-size: 15px;
             margin-bottom: 1px;
@@ -234,32 +304,32 @@
         .fixture-score {
             display: block;
             font-size: 11px;
-            color: #666;
+            color: var(--muted);
             margin-top: 0;
             font-weight: normal;
         }
 
         .playing {
-            background: #d4edda !important;
-            border: 2px solid #28a745 !important;
+            background: var(--playing-bg) !important;
+            border: 2px solid var(--playing-border) !important;
         }
 
         .finished {
-            background: #e9ecef !important;
+            background: var(--finished-bg) !important;
         }
 
         .not-playing {
-            background: #f8d7da !important;
+            background: var(--not-playing-bg) !important;
         }
 
         .empty-slot {
-            background: #fafafa !important;
+            background: var(--empty-bg) !important;
             opacity: 0.3;
         }
 
         @media (max-width: 768px), (max-height: 768px) {
-            /* Remove purple background on mobile */
-            body {
+            /* Light theme: plain white instead of the purple background on mobile */
+            html.light:not(.embed) body {
                 background: white;
             }
 
@@ -339,6 +409,13 @@
             }
         }
     </style>
+    <script>
+        (() => {
+            const p = new URLSearchParams(location.search);
+            if (p.get('theme') === 'light') document.documentElement.classList.add('light');
+            if (p.get('embed') === '1') document.documentElement.classList.add('embed');
+        })();
+    </script>
 </head>
 <body>
     <div class="container">
@@ -952,7 +1029,7 @@
                 // Team name cell
                 const teamCell = document.createElement('td');
                 teamCell.className = 'team-name';
-                const statusText = `<span class="mobile-hide" style="font-size: 9px; color: #999;">${awaitCount} AWAIT / ${playingCount} PLAYING / ${doneCount} DONE</span>`;
+                const statusText = `<span class="mobile-hide" style="font-size: 9px; color: var(--faint);">${awaitCount} AWAIT / ${playingCount} PLAYING / ${doneCount} DONE</span>`;
                 teamCell.innerHTML = `<strong>${team.team_name}</strong><br><small class="mobile-hide">${team.player_name}</small><br>${statusText}`;
                 row.appendChild(teamCell);
 
