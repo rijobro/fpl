@@ -463,7 +463,7 @@
             if (p.get('theme') === 'light') document.documentElement.classList.add('light');
             if (p.get('embed') === '1') document.documentElement.classList.add('embed');
 
-            // ?font=figtree (default) | inter | barlow | plex | roboto | classic
+            // ?font=barlow (default) | figtree | inter | plex | roboto | classic
             const fonts = {
                 figtree: ['Figtree', 'Figtree'],
                 inter: ['Inter', 'Inter'],
@@ -471,7 +471,7 @@
                 plex: ['IBM Plex Sans', 'IBM+Plex+Sans'],
                 roboto: ['Roboto Condensed', 'Roboto+Condensed'],
             };
-            const f = fonts[(p.get('font') || 'figtree').toLowerCase()];
+            const f = fonts[(p.get('font') || 'barlow').toLowerCase()];
             if (f) {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
