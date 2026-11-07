@@ -85,6 +85,7 @@
             background: var(--page-bg);
             color: var(--text);
             height: 100vh;
+            height: 100dvh; /* visible area: excludes a mobile address bar */
             margin: 0;
             padding: 0;
             overflow: hidden;
@@ -96,6 +97,7 @@
         .container {
             width: calc(100vw - 20px);
             height: calc(100vh - 20px);
+            height: calc(100dvh - 20px);
             margin: 10px;
             background: var(--card-bg);
             border-radius: 10px;
@@ -209,7 +211,7 @@
         th {
             background: var(--head-bg);
             color: var(--head-text);
-            font-weight: 600;
+            font-weight: 500;
             font-size: 0.72em;
             text-transform: uppercase;
             letter-spacing: 0.06em;
@@ -245,7 +247,7 @@
 
         td.team-name {
             text-align: left;
-            font-weight: 600;
+            font-weight: 400;
             background: var(--team-bg);
             white-space: nowrap;
             padding-left: 4px;
@@ -266,6 +268,15 @@
             margin-top: 0;
         }
 
+        .team-title {
+            font-weight: 600;
+        }
+
+        /* The player's own club in the fixture line: brighter, not bold */
+        .own-team {
+            color: var(--text);
+        }
+
         .chip-badge {
             margin-left: auto;
             font-size: 10px;
@@ -284,7 +295,7 @@
 
         .total-column {
             background: var(--total-bg) !important;
-            font-weight: 700;
+            font-weight: 500;
             color: var(--text);
         }
 
@@ -300,7 +311,7 @@
 
         .player-name {
             display: block;
-            font-weight: 500;
+            font-weight: 400;
             font-size: 16px;
             margin-bottom: 1px;
         }
@@ -308,7 +319,7 @@
         .player-points {
             display: block;
             color: var(--accent);
-            font-weight: 700;
+            font-weight: 600;
             font-size: 15px;
             margin-bottom: 1px;
         }
@@ -356,7 +367,7 @@
         .zero .player-points,
         .zero .player-name {
             color: var(--faint);
-            font-weight: 500;
+            font-weight: 400;
         }
 
         /* 8. Starting XI progress: done | playing | to come */
@@ -391,6 +402,7 @@
                 padding: 0;
                 width: 100vw;
                 height: 100vh;
+                height: 100dvh;
                 margin: 0;
                 box-shadow: none;
                 border-radius: 0;
@@ -425,7 +437,7 @@
 
             td.team-name {
                 font-size: 18px;
-                font-weight: 700;
+                font-weight: 400;
             }
 
             .player-cell {
@@ -435,17 +447,17 @@
 
             .player-name {
                 font-size: 14px;
-                font-weight: 600;
+                font-weight: 400;
             }
 
             .player-points {
                 font-size: 18px;
-                font-weight: 700;
+                font-weight: 600;
             }
 
             .total-column {
                 font-size: 20px;
-                font-weight: 800;
+                font-weight: 500;
             }
 
             /* Hide fixture scores on mobile */
@@ -976,32 +988,40 @@
             }
         }
 
+        // Fit the table to the visible space: scale it up or down to the
+        // limiting dimension, then stretch the rows to use any height left over,
+        // so the table always fills the page.
         function scaleTableToFit() {
             const container = document.getElementById('tableContainer');
             const wrapper = document.getElementById('tableWrapper');
             const table = document.getElementById('leagueTable');
 
-            // Reset scale to measure natural size
-            wrapper.style.transform = 'scale(1)';
+            // Measure the table at its natural size
+            wrapper.style.transform = 'none';
+            wrapper.style.width = '100%';
+            wrapper.style.height = '100%';
+            table.style.width = 'max-content';
+            table.style.height = 'auto';
 
-            // Get dimensions
             const containerWidth = container.clientWidth;
             const containerHeight = container.clientHeight;
             const tableWidth = table.offsetWidth;
             const tableHeight = table.offsetHeight;
+            if (!tableWidth || !tableHeight) {
+                table.style.width = '';
+                return;
+            }
 
-            // Calculate scale factors
-            const scaleX = containerWidth / tableWidth;
-            const scaleY = containerHeight / tableHeight;
-            const scale = Math.min(scaleX, scaleY);
+            const scale = Math.min(containerWidth / tableWidth, containerHeight / tableHeight);
 
-            // Allow unlimited scaling for maximum text size
-            const finalScale = scale;
-
-            // Apply scale
-            wrapper.style.transform = `scale(${finalScale})`;
-            wrapper.style.width = `${100 / finalScale}%`;
-            wrapper.style.height = `${100 / finalScale}%`;
+            // Lay the table out at the size it will fill once scaled
+            wrapper.style.width = `${containerWidth / scale}px`;
+            wrapper.style.height = `${containerHeight / scale}px`;
+            // Rows grow by at most 2x, so a tall portrait screen doesn't get
+            // giant rows of tiny text.
+            table.style.width = '100%';
+            table.style.height = `${Math.min(containerHeight / scale, tableHeight * 2)}px`;
+            wrapper.style.transform = `scale(${scale})`;
         }
 
         function renderTable(data) {
@@ -1106,7 +1126,7 @@
                 const chip = team.active_chip
                     ? `<span class="chip-badge" title="Active chip: ${team.active_chip}">${chipNames[team.active_chip] || team.active_chip.toUpperCase()}</span>`
                     : '';
-                teamCell.innerHTML = `<strong>${team.team_name}</strong><br><small class="mobile-hide">${team.player_name}</small><div class="team-foot">${statusText}${chip}</div>`;
+                teamCell.innerHTML = `<span class="team-title">${team.team_name}</span><br><small class="mobile-hide">${team.player_name}</small><div class="team-foot">${statusText}${chip}</div>`;
                 row.appendChild(teamCell);
 
                 const orderedPlayers = mapTeamToColumns(team, columnLayout);
@@ -1184,10 +1204,10 @@
                     if (player.fixture_score) {
                         const fs = player.fixture_score;
                         const teamH = fs.player_team === fs.team_h
-                            ? `<strong>${fs.team_h}</strong>`
+                            ? `<span class="own-team">${fs.team_h}</span>`
                             : fs.team_h;
                         const teamA = fs.player_team === fs.team_a
-                            ? `<strong>${fs.team_a}</strong>`
+                            ? `<span class="own-team">${fs.team_a}</span>`
                             : fs.team_a;
 
                         if (!fs.started) {
