@@ -470,6 +470,23 @@
                 display: none !important;
             }
         }
+
+        /* Phones held upright: lay the page out sideways, so it reads as
+           landscape when the phone is turned (a web page can't rotate the
+           screen itself; iOS doesn't allow orientation locking at all). */
+        @media (orientation: portrait) and (max-width: 600px) {
+            .container {
+                position: fixed;
+                top: 0;
+                left: 100vw;
+                width: 100vh;
+                width: 100dvh;
+                height: 100vw;
+                margin: 0;
+                transform-origin: top left;
+                transform: rotate(90deg);
+            }
+        }
     </style>
     <script>
         (() => {
