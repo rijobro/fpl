@@ -20,9 +20,14 @@
             --faint: #6b717c;
             --accent: #8b9cff;
             --border: #2c313a;
-            --head-bg: #3f4fbf;
-            --head-hover: #4c5dd0;
-            --head-sorted: #33419f;
+            --head-bg: #181b21;
+            --head-text: #8a909b;
+            --head-hover: #22262e;
+            --head-sorted: #1f232a;
+            --row-line: #23272f;
+            --live: #34c759;
+            --done-bar: #5b616c;
+            --await-bar: #2c313a;
             --cell-bg: #181b21;
             --team-bg: #1f232a;
             --hover-bg: #22262e;
@@ -30,11 +35,6 @@
             --chip-bg: rgba(255, 193, 7, 0.16);
             --chip-text: #ffd54f;
             --chip-empty: #4a4f58;
-            --playing-bg: rgba(40, 167, 69, 0.28);
-            --playing-border: #2fb653;
-            --finished-bg: #262a31;
-            --not-playing-bg: rgba(220, 53, 69, 0.22);
-            --empty-bg: #15181d;
             --error-bg: rgba(220, 53, 69, 0.25);
             --error-text: #f5a3ab;
         }
@@ -49,9 +49,14 @@
             --faint: #999;
             --accent: #667eea;
             --border: #ddd;
-            --head-bg: #667eea;
-            --head-hover: #7c92f0;
-            --head-sorted: #4c5fcf;
+            --head-bg: #f1f3f7;
+            --head-text: #5f6570;
+            --head-hover: #e6e9f0;
+            --head-sorted: #e1e5ee;
+            --row-line: #e6e8ec;
+            --live: #22a447;
+            --done-bar: #a0a6b0;
+            --await-bar: #e3e6ea;
             --cell-bg: transparent;
             --team-bg: #f8f9fa;
             --hover-bg: #f5f5f5;
@@ -59,11 +64,6 @@
             --chip-bg: #fff3cd;
             --chip-text: #856404;
             --chip-empty: #ccc;
-            --playing-bg: #d4edda;
-            --playing-border: #28a745;
-            --finished-bg: #e9ecef;
-            --not-playing-bg: #f8d7da;
-            --empty-bg: #fafafa;
             --error-bg: #f8d7da;
             --error-text: #721c24;
         }
@@ -81,7 +81,7 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: var(--font, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif);
             background: var(--page-bg);
             color: var(--text);
             height: 100vh;
@@ -195,7 +195,8 @@
         th, td {
             padding: 4px 4px;
             text-align: center;
-            border: 1px solid var(--border);
+            border: none;
+            border-bottom: 1px solid var(--row-line);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -207,8 +208,12 @@
 
         th {
             background: var(--head-bg);
-            color: white;
+            color: var(--head-text);
             font-weight: 600;
+            font-size: 0.72em;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding-block: 8px;
             position: sticky;
             top: 0;
             z-index: 10;
@@ -225,6 +230,7 @@
 
         th.sorted {
             background: var(--head-sorted);
+            color: var(--accent);
         }
 
         th.team-header {
@@ -309,21 +315,63 @@
             font-weight: normal;
         }
 
-        .playing {
-            background: var(--playing-bg) !important;
-            border: 2px solid var(--playing-border) !important;
+        .player-cell {
+            position: relative;
         }
 
-        .finished {
-            background: var(--finished-bg) !important;
+        /* Match status: a thin bar on the left of the cell; live games also
+           get a pulsing dot. */
+        .playing {
+            box-shadow: inset 3px 0 0 var(--live);
+        }
+
+        .playing::after {
+            content: '';
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--live);
+            animation: pulse 1.6s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.35; transform: scale(0.7); }
         }
 
         .not-playing {
-            background: var(--not-playing-bg) !important;
+            box-shadow: inset 3px 0 0 #d64550;
         }
 
+        /* 3. A zero from a game that has started fades back */
+        .zero .player-points,
+        .zero .player-name {
+            color: var(--faint);
+            font-weight: 500;
+        }
+
+        /* 8. Starting XI progress: done | playing | to come */
+        .xi-bar {
+            display: flex;
+            gap: 2px;
+            height: 4px;
+            margin-top: 4px;
+            width: 100%;
+            min-width: 90px;
+        }
+
+        .xi-bar span {
+            border-radius: 2px;
+        }
+
+        .xi-bar .done { background: var(--done-bar); }
+        .xi-bar .live { background: var(--live); }
+        .xi-bar .await { background: var(--await-bar); }
+
         .empty-slot {
-            background: var(--empty-bg) !important;
             opacity: 0.3;
         }
 
@@ -414,6 +462,27 @@
             const p = new URLSearchParams(location.search);
             if (p.get('theme') === 'light') document.documentElement.classList.add('light');
             if (p.get('embed') === '1') document.documentElement.classList.add('embed');
+
+            // ?font=figtree (default) | inter | barlow | plex | roboto | classic
+            const fonts = {
+                figtree: ['Figtree', 'Figtree'],
+                inter: ['Inter', 'Inter'],
+                barlow: ['Barlow Semi Condensed', 'Barlow+Semi+Condensed'],
+                plex: ['IBM Plex Sans', 'IBM+Plex+Sans'],
+                roboto: ['Roboto Condensed', 'Roboto+Condensed'],
+            };
+            const f = fonts[(p.get('font') || 'figtree').toLowerCase()];
+            if (f) {
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = `https://fonts.googleapis.com/css2?family=${f[1]}:wght@400;500;600;700;800&display=swap`;
+                document.documentElement.style.setProperty('--font',
+                    `'${f[0]}', system-ui, -apple-system, 'Segoe UI', sans-serif`);
+                // Re-fit the table once the web font has loaded
+                link.onload = () => document.fonts.load(`700 16px '${f[0]}'`)
+                    .then(() => window.scaleTableToFit && scaleTableToFit());
+                document.head.appendChild(link);
+            }
         })();
     </script>
 </head>
@@ -1029,8 +1098,9 @@
                 // Team name cell
                 const teamCell = document.createElement('td');
                 teamCell.className = 'team-name';
-                const statusText = `<span class="mobile-hide" style="font-size: 9px; color: var(--faint);">${awaitCount} AWAIT / ${playingCount} PLAYING / ${doneCount} DONE</span>`;
-                teamCell.innerHTML = `<strong>${team.team_name}</strong><br><small class="mobile-hide">${team.player_name}</small><br>${statusText}`;
+                const seg = (cls, n) => n ? `<span class="${cls}" style="flex: ${n}"></span>` : '';
+                const statusText = `<div class="xi-bar mobile-hide" title="Starting XI: ${doneCount} done, ${playingCount} playing, ${awaitCount} to come">${seg('done', doneCount)}${seg('live', playingCount)}${seg('await', awaitCount)}</div>`;
+                teamCell.innerHTML = `<strong>${team.team_name}</strong><br><small class="mobile-hide">${team.player_name}</small>${statusText}`;
                 row.appendChild(teamCell);
 
                 // Chip cell
@@ -1079,6 +1149,10 @@
                     // Add finished class if player's game is finished
                     else if (player.fixture_score && player.fixture_score.finished) {
                         cell.classList.add('finished');
+                    }
+
+                    if (player.points === 0 && player.fixture_score && player.fixture_score.started) {
+                        cell.classList.add('zero');
                     }
 
                     // Build detailed title with all stats
