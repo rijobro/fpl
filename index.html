@@ -1183,9 +1183,14 @@
 
                     cell.title = title;
 
-                    const pointsText = player.multiplier > 1
-                        ? `${player.actual_points} (${player.points}×${player.multiplier})`
-                        : player.points;
+                    // No score until the player's match has kicked off
+                    // (a non-breaking space keeps the cell height).
+                    const notStarted = player.fixture_score && !player.fixture_score.started;
+                    const pointsText = notStarted && !player.points
+                        ? '&nbsp;'
+                        : player.multiplier > 1
+                            ? `${player.actual_points} (${player.points}×${player.multiplier})`
+                            : player.points;
 
                     let fixtureScoreHtml = '';
                     if (player.fixture_score) {
