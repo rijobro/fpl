@@ -316,6 +316,10 @@
             margin-bottom: 1px;
         }
 
+        .captain-mark {
+            color: var(--accent);
+        }
+
         .player-points {
             display: block;
             color: var(--accent);
@@ -888,6 +892,8 @@
                                 points: points,
                                 actual_points: actualPoints,
                                 multiplier: multiplier,
+                                is_captain: pick.is_captain,
+                                is_vice_captain: pick.is_vice_captain,
                                 position: pick.position,
                                 position_type: playerInfo.position,
                                 is_playing: isPlaying,
@@ -1239,8 +1245,15 @@
                         }
                     }
 
+                    const captainLabel = player.is_captain
+                        ? (player.multiplier === 3 ? '(tc)' : '(c)')
+                        : player.is_vice_captain ? '(v)' : '';
+                    const captainMark = captainLabel
+                        ? ` <span class="captain-mark">${captainLabel}</span>`
+                        : '';
+
                     cell.innerHTML = `
-                        <span class="player-name">${player.name}</span>
+                        <span class="player-name">${player.name}${captainMark}</span>
                         <span class="player-points">${pointsText}</span>
                         ${fixtureScoreHtml}
                     `;
